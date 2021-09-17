@@ -1,0 +1,140 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ogame.fullname" . }}-api
+  labels:
+    {{- include "ogame.labels" . | nindent 4 }}
+spec:
+{{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+{{- end }}
+  selector:
+    matchLabels:
+      {{- include "ogame.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+    {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      labels:
+        {{- include "ogame.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "ogame.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}-api
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.web.repository }}:{{ .Values.web.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.web.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          envFrom:
+            - configMapRef:
+                name: {{ .Release.Name }}-configmap
+          env:
+            - name: ASPNETCORE_URLS
+              value: "http://+:80"
+          {{- if .Values.ingress.enabled}}
+          {{- $protocol := "http" -}}
+          {{- if .Values.ingress.tls -}}
+            {{- $protocol = "https" -}}
+          {{- end }}
+          {{- with (index .Values.ingress.hosts 0) }} 
+            - name: IdentityServer__Authentication__Authority
+              value: {{$protocol}}://{{ .host }}
+          {{- end }}
+          {{- end }}
+            - name: IdentityServer__Key__Type
+              value: {{ .Values.signing.type }}
+          {{- if contains "File" .Values.signing.type}}
+            - name: IdentityServer__Key__FilePath
+              value: "/etc/secrets/signing.pfx"
+            - name: IdentityServer__Key__Password
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name -}}-signing
+                  key: password
+            - name: "ConnectionStrings__DefaultConnection"
+              value: "Server=$(DB_SERVER);Initial Catalog=$(DB_NAME);Persist Security Info=False;User ID=$(DB_USERNAME);Password=$(DB_PASSWORD);MultipleActiveResultSets=False;Encrypt=True;Connection Timeout=30;"
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- if contains "File" .Values.signing.type}}
+          volumeMounts:
+            - name: {{ .Release.Name }}-signing
+              mountPath: "/etc/secrets"
+              readOnly: true
+          {{- end }}
+      {{- if contains "File" .Values.signing.type}}
+      volumes:
+        - name: {{ .Release.Name }}-signing
+          secret:
+            secretName: {{ .Release.Name }}-signing
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ogame.fullname" . }}-worker
+  labels:
+    {{- include "ogame.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "ogame.name" . }}-worker
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "ogame.name" . }}-worker
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "ogame.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}-worker
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.worker.repository }}:{{ .Values.worker.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.worker.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: {{ .Release.Name }}-configmap
+          env:
+            - name: "ConnectionStrings__DefaultConnection"
+              value: "Server=$(DB_SERVER);Initial Catalog=$(DB_NAME);Persist Security Info=False;User ID=$(DB_USERNAME);Password=$(DB_PASSWORD);MultipleActiveResultSets=False;Encrypt=True;Connection Timeout=30;"
