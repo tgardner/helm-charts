@@ -28,6 +28,6 @@ spec:
               imagePullPolicy: IfNotPresent
               name: {{ .Chart.Name }}-points-cron
               envFrom:
-                - configMapRef:
-                    name: {{ .Release.Name }}-configmap
+                - secretRef:
+                    name: {{ .Release.Name }}-config
           restartPolicy: Never

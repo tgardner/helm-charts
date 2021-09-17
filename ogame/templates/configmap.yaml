@@ -3,4 +3,4 @@ kind: ConfigMap
 metadata:
   name: {{ .Release.Name }}-configmap
 data:
-  {{- toYaml .Values.config | nindent 2 }}
+  {{- toYaml .Values.config.game | nindent 2 }}

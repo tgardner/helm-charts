@@ -85,8 +85,10 @@ tolerations: []
 affinity: {}
 
 config:
-  BundleId: "biz.tdizz.ogame"
-  FromName: "OGame"
+  server:
+    BundleId: "biz.tdizz.ogame"
+    FromName: "OGame"
+  game: {}
 
 signing: 
   type: "Development"

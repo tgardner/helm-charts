@@ -48,6 +48,8 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ .Release.Name }}-configmap
+            - secretRef:
+                name: {{ .Release.Name }}-config
           env:
             - name: ASPNETCORE_URLS
               value: "http://+:80"
@@ -135,6 +137,8 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ .Release.Name }}-configmap
+            - secretRef:
+                name: {{ .Release.Name }}-config
           env:
             - name: "ConnectionStrings__DefaultConnection"
               value: "Server=$(DB_SERVER);Initial Catalog=$(DB_NAME);Persist Security Info=False;User ID=$(DB_USERNAME);Password=$(DB_PASSWORD);MultipleActiveResultSets=False;Encrypt=True;Connection Timeout=30;"
